@@ -1,5 +1,9 @@
 
-from db.session import testar_ligacao
+from sqlalchemy import text
 
-if testar_ligacao():
-    print("Ligação ao PostgreSQL estabelecida com sucesso!")
+from db.session import engine
+
+with engine.connect() as connection:
+    assert connection.execute(text("SELECT 1")).scalar_one() == 1
+
+print("Ligação à base de dados estabelecida com sucesso!")

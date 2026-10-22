@@ -1,31 +1,59 @@
-
 import os
 from pathlib import Path
+from collections.abc import Generator
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-# Localiza o ficheiro .env na raiz do backend
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
-# Lê as configurações da base de dados
-db_url = URL.create(
-    drivername="postgresql+psycopg",
-    username=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST", "localhost"),
-    port=int(os.getenv("DB_PORT", "5432")),
-    database=os.getenv("DB_NAME"),
+database_url = os.getenv("DATABASE_URL")
+database_settings = {
+    "username": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "host": os.getenv("DB_HOST"),
+    "database": os.getenv("DB_NAME"),
+}
+
+if database_url:
+    DATABASE_URL = database_url
+elif any(database_settings.values()):
+    missing_settings = [
+        key for key, value in database_settings.items() if not value
+    ]
+    if missing_settings:
+        raise RuntimeError(
+            "Configuração PostgreSQL incompleta no .env. "
+            f"Falta configurar: {', '.join(missing_settings)}."
+        )
+    DATABASE_URL = URL.create(
+        drivername="postgresql+psycopg",
+        username=database_settings["username"],
+        password=database_settings["password"],
+        host=database_settings["host"],
+        port=int(os.getenv("DB_PORT", "5432")),
+        database=database_settings["database"],
+    )
+else:
+    DATABASE_URL = f"sqlite:///{(BASE_DIR / 'taskflow.db').as_posix()}"
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"check_same_thread": False}
+    if str(DATABASE_URL).startswith("sqlite")
+    else {},
 )
-
-# Cria a ligação à base de dados
-engine = create_engine(db_url, pool_pre_ping=True)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
-def testar_ligacao() -> bool:
-    """Verifica se conseguimos executar uma consulta."""
-    with engine.connect() as connection:
-        resultado = connection.execute(text("SELECT 1"))
-        return resultado.scalar_one() == 1
+class Base(DeclarativeBase):
+    pass
+
+
+def get_db() -> Generator[Session, None, None]:
+    with SessionLocal() as session:
+        yield session
