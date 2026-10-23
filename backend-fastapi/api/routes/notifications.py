@@ -24,6 +24,8 @@ def list_notifications(
     )
 
 
+# Marcar como lida e uma operacao idempotente em termos de autorizacao: apenas
+# o dono da notificacao pode alterar o estado.
 @router.patch("/{notification_id}/read", response_model=NotificationPublic)
 def mark_notification_read(
     notification_id: int,

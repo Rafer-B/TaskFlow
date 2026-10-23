@@ -1,3 +1,4 @@
+// Tipos das respostas da API; os campos e uniões refletem o contrato consumido pela interface.
 export interface User {
   id: number
   name: string
@@ -68,9 +69,11 @@ interface AuthResult {
 
 export function useTaskflow() {
   const config = useRuntimeConfig()
+  // `useState` mantém sessão reativa entre componentes e permite hidratação segura no Nuxt.
   const token = useState<string | null>('taskflow-token', () => null)
   const user = useState<User | null>('taskflow-user', () => null)
 
+  // Cliente HTTP partilhado: junta cabeçalhos da sessão e normaliza erros da API/rede.
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = new Headers(options.headers)
     headers.set('Accept', 'application/json')
@@ -92,10 +95,12 @@ export function useTaskflow() {
       const body = await response.json().catch(() => null) as { detail?: string } | null
       throw new Error(body?.detail ?? 'Não foi possível concluir o pedido.')
     }
+    // Respostas 204 não têm corpo JSON; o cast adapta esse caso ao tipo genérico do pedido.
     if (response.status === 204) return undefined as T
     return response.json() as Promise<T>
   }
 
+  // Login e registo partilham o endpoint, guardando o token só no navegador.
   async function authenticate(path: '/api/auth/login' | '/api/auth/register', payload: object) {
     const result = await request<AuthResult>(path, {
       method: 'POST',
@@ -107,6 +112,7 @@ export function useTaskflow() {
     return result.user
   }
 
+  // Acesso ao armazenamento é exclusivo do cliente; o token guardado é validado novamente na API.
   async function restoreSession() {
     if (!import.meta.client) return
     const savedToken = localStorage.getItem('taskflow-token')
@@ -119,6 +125,7 @@ export function useTaskflow() {
     }
   }
 
+  // Limpa o estado reativo e o token persistido para terminar a sessão neste dispositivo.
   function signOut() {
     token.value = null
     user.value = null

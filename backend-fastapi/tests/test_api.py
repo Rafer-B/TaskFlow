@@ -29,6 +29,8 @@ from app.models import (
 from db.session import Base, get_db
 
 
+# A suite de testes monta uma base SQLite em memoria, sobrepoe o `get_db` da
+# app e valida fluxo de autenticacao, projetos, tarefas e integracoes de migracao.
 class TaskFlowApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -74,6 +76,8 @@ class TaskFlowApiTests(unittest.TestCase):
         body = response.json()
         return body["access_token"], body["user"]["id"]
 
+# Este teste cobre o fluxo principal: registro, criacao de projeto, atribuicao,
+# filtros e atualizacao de membros/estado.
     def test_authenticated_project_task_and_team_flow(self) -> None:
         token, owner_id = self.register("Ramalho", "ramalho@example.pt")
         headers = {"Authorization": f"Bearer {token}"}

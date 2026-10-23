@@ -2,6 +2,7 @@
 import type { Attachment, Comment, Notification, Project, Task, User } from '~/composables/useTaskflow'
 
 const { token, user, request, authenticate, restoreSession, signOut } = useTaskflow()
+// Estado de domínio e de navegação; `ref` permite que as alterações atualizem a vista.
 const projects = ref<Project[]>([])
 const tasks = ref<Task[]>([])
 const dashboardTasks = ref<Task[]>([])
@@ -52,6 +53,7 @@ const projectSearch = ref('')
 const projectStatusFilter = ref('')
 const today = new Date().toISOString().slice(0, 10)
 
+// Seleções derivadas mantêm detalhes e contadores sincronizados com os dados carregados.
 const activeProject = computed(() =>
   projects.value.find((project) => project.id === activeProjectId.value) ?? null,
 )
@@ -66,6 +68,7 @@ const calendarCells = computed(() => {
   const year = calendarMonth.value.getFullYear()
   const month = calendarMonth.value.getMonth()
   const firstWeekday = new Date(year, month, 1).getDay()
+  // Ajusta o início para segunda-feira e cria seis semanas para uma grelha estável.
   const start = new Date(year, month, 1 - ((firstWeekday + 6) % 7))
   return Array.from({ length: 42 }, (_, index) => {
     const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index)
@@ -89,6 +92,7 @@ const completedTasks = computed(() => tasks.value.filter((task) => task.status =
 const progress = computed(() => tasks.value.length ? Math.round(completedTasks.value / tasks.value.length * 100) : 0)
 const overdueTasks = computed(() => tasks.value.filter((task) => task.deadline && task.deadline < today && task.status !== 'done').length)
 const initials = computed(() => user.value?.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() ?? 'TF')
+// Os indicadores do resumo combinam tarefas de todos os projetos; a vista de detalhe usa `tasks`.
 const projectDashboardStats = computed(() => ({
   active: projects.value.length,
   inProgress: dashboardTasks.value.filter((task) => task.status === 'in_progress').length,
@@ -129,6 +133,7 @@ const filteredProjects = computed(() => projects.value.filter((project) => {
   return matchesSearch && matchesStatus
 }))
 
+// Estado, prioridade e prazo do projeto são inferidos das tarefas carregadas para o dashboard.
 function projectProgress(projectId: number) {
   const projectTasks = dashboardTasks.value.filter((task) => task.project_id === projectId)
   return projectTasks.length
@@ -183,6 +188,7 @@ function clearMessages() {
   notice.value = ''
 }
 
+// Endpoints de carregamento alimentam separadamente a lista, o resumo e o projeto selecionado.
 async function loadProjects() {
   projects.value = await request<Project[]>(`/api/projects?archived=${showArchivedProjects.value}`)
   if (!activeProjectId.value || !projects.value.some((project) => project.id === activeProjectId.value)) {
@@ -245,6 +251,7 @@ async function refresh() {
   }
 }
 
+// Restaura a sessão apenas no cliente e recarrega os dados sempre que muda o projeto ativo.
 onMounted(async () => {
   await restoreSession()
   if (token.value) await refresh()
@@ -274,6 +281,7 @@ async function submitAuth() {
   }
 }
 
+// Os formulários reutilizam estado reativo; Object.assign atualiza os campos sem trocar o objeto.
 function openProjectForm(project?: Project) {
   clearMessages()
   editingProject.value = Boolean(project)
@@ -300,6 +308,7 @@ async function saveProject() {
   }
 }
 
+// Operações de escrita atualizam a API e recarregam os dados afetados para refletir o resultado.
 async function archiveProject() {
   if (!activeProject.value) return
   const action = activeProject.value.archived ? 'desarquivar' : 'arquivar'
@@ -387,6 +396,7 @@ async function inviteMember() {
   }
 }
 
+// Abrir tarefa também seleciona o respetivo projeto antes de carregar a conversa associada.
 async function openTask(task: Task) {
   selectedTaskId.value = task.id
   activeProjectId.value = task.project_id
@@ -431,6 +441,7 @@ async function markNotificationRead(notification: Notification) {
   }
 }
 
+// O construtor Date normaliza automaticamente mudanças de ano ao navegar entre meses.
 function changeCalendarMonth(amount: number) {
   calendarMonth.value = new Date(
     calendarMonth.value.getFullYear(),
@@ -461,6 +472,7 @@ function priorityLabel(priority: string) {
   return ({ low: 'Baixa', medium: 'Média', high: 'Alta' })[priority] ?? priority
 }
 
+// Terminar sessão também descarta dados em memória para não os mostrar a outra conta.
 function handleSignOut() {
   accountMenuOpen.value = false
   signOut()
@@ -477,6 +489,7 @@ function handleSignOut() {
 </script>
 
 <template>
+  <!-- Visitantes recebem o formulário; após autenticação, a mesma rota mostra o espaço de trabalho. -->
   <main v-if="!user" class="auth-page">
     <section class="auth-panel">
       <NuxtLink to="/" class="brand auth-brand"><span class="brand-mark">TF</span><span>taskflow<span class="brand-period">.</span></span></NuxtLink>
@@ -553,6 +566,7 @@ function handleSignOut() {
     </section>
   </main>
 
+  <!-- A navegação lateral escolhe vistas sem trocar de rota; a área principal renderiza a vista ativa. -->
   <main v-else class="workspace" :class="{ 'projects-workspace': ['projects', 'project', 'task'].includes(activeView), 'project-detail-workspace': activeView === 'project', 'task-detail-workspace': activeView === 'task' }">
     <aside class="sidebar">
       <NuxtLink to="/" class="brand"><span class="brand-mark">TF</span><span>taskflow<span class="brand-period">.</span></span></NuxtLink>
@@ -596,6 +610,7 @@ function handleSignOut() {
         <div v-if="error" class="message message-error global-message"><span>{{ error }}</span><button @click="clearMessages">×</button></div>
         <div v-if="notice" class="message message-success global-message"><span>{{ notice }}</span><button @click="notice = ''">×</button></div>
 
+        <!-- Resumo transversal: estatísticas e prazos são calculados sobre todas as tarefas acessíveis. -->
         <template v-if="activeView === 'overview'">
           <div class="page-intro">
             <div class="page-title-group"><span class="eyebrow"><span class="eyebrow-dot"></span> O TEU ESPAÇO DE TRABALHO</span><h1>Olá, {{ user.name.split(' ')[0] }}!</h1><p>Aqui está o resumo dos teus projetos e do que merece atenção.</p></div>
@@ -631,6 +646,7 @@ function handleSignOut() {
           </section>
         </template>
 
+        <!-- Pesquisa e filtros afetam a coleção visível sem alterar os projetos originais. -->
         <template v-else-if="activeView === 'projects'">
           <section class="project-metrics" aria-label="Resumo dos projetos">
             <article class="project-metric metric-projects"><strong>{{ projectDashboardStats.active }}</strong><span>{{ showArchivedProjects ? 'Projetos arquivados' : 'Projetos ativos' }}</span></article>
@@ -681,6 +697,7 @@ function handleSignOut() {
           </section>
         </template>
 
+        <!-- As tarefas globais podem ser abertas para consultar ou atualizar os seus detalhes. -->
         <template v-else-if="activeView === 'tasks'">
           <div class="page-intro"><div class="page-title-group"><span class="eyebrow">PLANO DE TRABALHO</span><h1>Todas as tarefas</h1><p>Pesquisa e acompanha tarefas dos teus projetos.</p></div></div>
           <div class="filter-bar"><label class="search-box"><span>⌕</span><input v-model="search" placeholder="Procurar tarefas..." aria-label="Procurar tarefas"></label><select v-model="statusFilter"><option value="">Todos os estados</option><option value="todo">Por iniciar</option><option value="in_progress">Em curso</option><option value="done">Concluídas</option><option value="blocked">Bloqueadas</option></select></div>
@@ -693,6 +710,7 @@ function handleSignOut() {
           </div>
         </template>
 
+        <!-- Grelha mensal com prazos; cada evento abre o detalhe da tarefa correspondente. -->
         <template v-else-if="activeView === 'calendar'">
           <div class="page-intro"><div class="page-title-group"><span class="eyebrow">PLANEAMENTO</span><h1>Calendário</h1><p>Vê os prazos de todos os teus projetos num só lugar.</p></div></div>
           <section class="calendar-panel">
@@ -702,24 +720,28 @@ function handleSignOut() {
           </section>
         </template>
 
+        <!-- A equipa é contextual ao projeto selecionado e só o responsável pode convidar membros. -->
         <template v-else-if="activeView === 'team'">
           <div class="page-intro"><div class="page-title-group"><span class="eyebrow">COLABORAÇÃO</span><h1>Equipa</h1><p>{{ activeProject ? `Membros de ${activeProject.name}.` : 'Seleciona um projeto para veres a equipa.' }}</p></div><div v-if="activeProject?.owner_id === user.id" class="intro-actions"><button class="button button-primary" @click="showInvite = true">＋ Convidar membro</button></div></div>
           <div v-if="activeProject" class="team-member-list"><article v-for="member in members" :key="member.id" class="team-member-card"><span class="profile-avatar">{{ member.name.slice(0, 1).toUpperCase() }}</span><span><strong>{{ member.name }}</strong><small>{{ member.email }}</small></span><span class="member-role">{{ member.id === activeProject.owner_id ? 'Líder do projeto' : 'Membro' }}</span></article></div>
           <div v-else class="empty-state"><h3>Escolhe um projeto</h3><p>Abre um projeto para consultar e gerir os membros da equipa.</p><button class="button button-primary" @click="activeView = 'projects'">Ver projetos</button></div>
         </template>
 
+        <!-- Marcar como lida confirma a alteração na API e substitui apenas o registo atualizado. -->
         <template v-else-if="activeView === 'notifications'">
           <div class="page-intro"><div class="page-title-group"><span class="eyebrow">ATUALIZAÇÕES</span><h1>Notificações</h1><p>{{ unreadNotifications }} por ler.</p></div></div>
           <div v-if="notifications.length" class="notification-list"><button v-for="notification in notifications" :key="notification.id" class="notification-card" :class="{ 'notification-unread': !notification.is_read }" @click="markNotificationRead(notification)"><span class="notification-icon">♧</span><span><strong>{{ notification.title }}</strong><small>{{ notification.message }}</small><small>{{ formatDate(notification.created_at.slice(0, 10)) }}</small></span><i v-if="!notification.is_read"></i></button></div>
           <div v-else class="empty-state"><span class="empty-icon">✓</span><h3>Estás a par de tudo.</h3><p>As notificações dos teus projetos vão aparecer aqui.</p></div>
         </template>
 
+        <!-- Os anexos pertencem ao projeto ativo e são apresentados como ligações para os ficheiros. -->
         <template v-else-if="activeView === 'documents'">
           <div class="page-intro"><div class="page-title-group"><span class="eyebrow">FICHEIROS DO PROJETO</span><h1>Documentos</h1><p>{{ activeProject?.name ?? 'Seleciona um projeto para consultar os documentos.' }}</p></div></div>
           <div v-if="attachments.length" class="document-list"><a v-for="attachment in attachments" :key="attachment.id" class="document-card" :href="attachment.url" target="_blank" rel="noopener noreferrer"><span class="document-icon">↗</span><span><strong>{{ attachment.file_name }}</strong><small>{{ attachment.file_type }} · {{ (attachment.size_bytes / 1024).toFixed(1) }} KB</small></span><span class="document-task">{{ dashboardTasks.find((task) => task.id === attachment.task_id)?.title ?? 'Tarefa' }}</span></a></div>
           <div v-else class="empty-state"><span class="empty-icon">▤</span><h3>Sem documentos anexados.</h3><p>Os ficheiros associados às tarefas deste projeto serão apresentados aqui.</p><button class="button button-soft" @click="activeView = 'project'">Voltar ao projeto</button></div>
         </template>
 
+        <!-- Detalhe da tarefa reúne conversa, anexos e atributos editáveis num só contexto. -->
         <template v-else-if="activeView === 'task' && selectedTask">
           <nav class="task-detail-breadcrumb" aria-label="Navegação da tarefa">
             <button @click="activeView = 'project'">{{ projects.find((project) => project.id === selectedTask.project_id)?.name ?? 'Projeto' }}</button>
@@ -791,6 +813,7 @@ function handleSignOut() {
           </article>
         </template>
 
+        <!-- Visão do projeto agrega equipa, métricas e tarefas; permissões condicionam ações de gestão. -->
         <template v-else-if="activeView === 'project' && activeProject">
           <nav class="project-tabs" aria-label="Secções do projeto">
             <button class="project-tab active">Visão geral</button>
@@ -883,11 +906,13 @@ function handleSignOut() {
           </div>
         </template>
 
+        <!-- Estado inicial da área de projetos, exibido quando ainda não há projeto selecionado. -->
         <section v-else-if="activeView === 'project' && !loading" class="welcome-state"><span class="welcome-orbit">✳</span><span class="eyebrow"><span class="eyebrow-dot"></span> UM NOVO SEMESTRE, NOVAS POSSIBILIDADES</span><h1>As grandes ideias<br>merecem um <span>plano.</span></h1><p>Cria o teu primeiro projeto e reúne aqui as tarefas, os prazos e a equipa. O próximo passo começa agora.</p><button class="button button-primary" @click="openProjectForm()">＋ Criar o meu primeiro projeto</button><div class="welcome-note">✦ &nbsp;Feito para aprender, criar e chegar mais longe.</div></section>
       </div>
       <footer class="page-footer"><span>© 2026 ARROW4D <i>·</i> TASKFLOW</span><span>Um passo de cada vez. <b>✳</b></span></footer>
     </section>
 
+    <!-- Diálogos de edição/criação mantêm o contexto da página e fecham ao clicar fora do cartão. -->
     <div v-if="showProjectForm" class="modal-backdrop" @click.self="showProjectForm = false">
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="project-modal-title">
         <button class="modal-close" aria-label="Fechar" @click="showProjectForm = false">×</button>

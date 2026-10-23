@@ -26,6 +26,8 @@ from db.session import get_db
 
 router = APIRouter(prefix="/api/projects", tags=["Projetos"])
 
+# Todas as operacoes de projeto passam por `get_accessible_project` para impedir
+# que um utilizador aceda a dados de projetos que nao lhe pertencem.
 
 @router.get("/{project_id}/attachments", response_model=list[AttachmentPublic])
 def list_project_attachments(
@@ -44,6 +46,8 @@ def list_project_attachments(
     )
 
 
+# `project_response` converte a entidade ORM em payload de API com metricas
+# agregadas, como tarefas concluidas e total de tarefas do projeto.
 def project_response(project: Project) -> ProjectPublic:
     total = len(project.tasks)
     completed = sum(task.status == "done" for task in project.tasks)
@@ -83,6 +87,8 @@ def list_projects(
     return [project_response(project) for project in projects]
 
 
+# A criacao do projeto tambem inicializa a equipa principal e associa o dono a
+# lideranca, preservando o comportamento esperado do dominio.
 @router.post("", response_model=ProjectPublic, status_code=status.HTTP_201_CREATED)
 def create_project(
     data: ProjectCreate,

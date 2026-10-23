@@ -6,6 +6,8 @@ from sqlalchemy.engine import Engine
 from app.models import Base
 
 
+# Estas constantes padronizam categorias e status em migracoes, desenhando
+# uma conversao gradual do esquema legado para os valores validos atuais.
 PROJECT_CATEGORIES = (
     "Investigação",
     "Desenvolvimento",
@@ -25,6 +27,8 @@ TASK_STATUSES = ("todo", "in_progress", "done", "blocked")
 TASK_PRIORITIES = ("low", "medium", "high")
 
 
+# A verificacao de FKs evita que o esquema legado fique em estado inconsistente
+# ao reutilizar a mesma coluna com nomes ou regras de exclusao diferentes.
 def _ensure_foreign_key(
     engine: Engine,
     table: str,
@@ -149,6 +153,8 @@ def _ensure_index(
         connection.execute(text(ddl))
 
 
+# No SQLite, a migracao reconstitui tabelas e indices antigos sem perder
+# registros de membros e relacoes de equipa antes do start da API.
 def upgrade_legacy_sqlite_schema(engine: Engine) -> None:
     additions = {
         "users": {
@@ -321,6 +327,8 @@ def _seed_project_types_and_teams(connection) -> None:
     )
 
 
+# O caminho PostgreSQL valida andamentos, colunas faltantes e restricoes para
+# garantir que o esquema legado continua compativel com o modelo atual.
 def upgrade_legacy_postgres_schema(engine: Engine) -> None:
     if engine.dialect.name != "postgresql":
         if engine.dialect.name == "sqlite":

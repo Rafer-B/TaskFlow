@@ -9,6 +9,8 @@ from app.security import get_user_id_from_token
 
 bearer = HTTPBearer(auto_error=False)
 
+# A autenticacao pelo esquema Bearer e opcional para permitir uma resposta 401
+# explicita quando nao ha token; depois, a rota valida o utilizador atual.
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
@@ -27,6 +29,8 @@ def get_current_user(
     return user
 
 
+# Este helper centraliza a regra de autorizacao: um usuario so ve projetos
+# em que e dono ou membro e evita duplicar validacoes em cada rota.
 def get_accessible_project(project_id: int, user: User, db: Session) -> Project:
     project = db.scalar(
         select(Project).where(

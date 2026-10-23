@@ -10,6 +10,8 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
+# O arquivo de sessao centraliza a configuracao da base de dados para SQLite
+# e PostgreSQL, mantendo `SessionLocal` consistente para toda a app.
 database_url = os.getenv("DATABASE_URL")
 database_settings = {
     "username": os.getenv("DB_USER"),
@@ -50,6 +52,8 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+# `Base` e a classe-mae do SQLAlchemy para todas as entidades ORM; por ela
+# a engine e os metadados ficam compartilhados em toda a aplicacao.
 class Base(DeclarativeBase):
     pass
 

@@ -13,6 +13,8 @@ TaskCategory = Literal[
 ]
 
 
+# Os schemas do Pydantic validam payloads e normalizam entradas antes de qualquer
+# escrita; isto reduz erros duplicados de dominio nos endpoints.
 class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
@@ -83,6 +85,8 @@ class ProjectMemberAdd(BaseModel):
     email: EmailStr
 
 
+# Modelos de resposta exp?em apenas campos seguros e resumidos, ideais para
+# serializacao em JSON sem expor informacao interna do ORM.
 class ProjectPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

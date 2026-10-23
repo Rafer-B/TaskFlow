@@ -28,6 +28,8 @@ def register(data: UserCreate, db: Session = Depends(get_db)) -> AuthResponse:
     return AuthResponse(access_token=create_access_token(user.id), user=user)
 
 
+# O login compara email normalizado e hash do password para garantir que a
+# autenticacao requer a mesma regra de hashing usada no registo.
 @router.post("/login", response_model=AuthResponse)
 def login(data: UserLogin, db: Session = Depends(get_db)) -> AuthResponse:
     user = db.scalar(select(User).where(User.email == str(data.email).lower()))

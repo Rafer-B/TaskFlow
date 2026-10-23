@@ -21,6 +21,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.session import Base
 
 
+# O ORM define entidades e relacoes de negocio; aqui ficam as regras de dominio
+# e os constraints que impedem dados inconsistentes de entrar na base de dados.
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
@@ -79,6 +81,8 @@ class User(Base):
     )
 
 
+# Project encapsula a associacao principal com o proprietario, lideres, membros
+# e tarefas, usando `association_proxy` para simplificar a navegacao.
 class Project(Base):
     __tablename__ = "projects"
     __table_args__ = (
@@ -319,6 +323,8 @@ class TaskStage(Base):
     stage: Mapped["ModelStage"] = relationship(back_populates="task_links")
 
 
+# Tasks centralizam estado, prioridade, categoria e vinculo ao projeto, com
+# validacoes SQLAlchemy equivalentes aos checks do banco.
 class Task(Base):
     __tablename__ = "tasks"
     __table_args__ = (

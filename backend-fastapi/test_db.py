@@ -1,4 +1,6 @@
 
+# Este script minimo serve de smoke test de conexao: confirma que a engine
+# consegue abrir uma sessao e executar uma query simples.
 from sqlalchemy import text
 
 from db.session import engine

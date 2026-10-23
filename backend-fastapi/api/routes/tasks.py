@@ -19,6 +19,8 @@ from db.session import get_db
 
 router = APIRouter(prefix="/api/projects/{project_id}/tasks", tags=["Tarefas"])
 
+# Esta rota aninhada usa o `project_id` como limite de escopo e evita que uma tarefa
+# de outro projeto seja consultada ou editada por acidente.
 
 @router.get("/{task_id}/comments", response_model=list[CommentPublic])
 def list_comments(
@@ -77,6 +79,8 @@ def create_comment(
     return comment
 
 
+# A validacao do responsavel garante que o utilizador atribuido faz parte do
+# mesmo projeto ou e o dono, evitando tarefas orfas ou acessos indevidos.
 def check_assignee(
     project: Project, assignee_id: int | None, db: Session
 ) -> User | None:
@@ -118,6 +122,8 @@ def list_tasks(
     )
 
 
+# A criacao de tarefas usa o assignee do payload ou o proprio dono do projeto
+# como fallback, mantendo coercoes de regras de negocio em um unico lugar.
 @router.post("", response_model=TaskPublic, status_code=status.HTTP_201_CREATED)
 def create_task(
     project_id: int,
