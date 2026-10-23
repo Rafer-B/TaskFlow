@@ -149,8 +149,182 @@ def _ensure_index(
         connection.execute(text(ddl))
 
 
+def upgrade_legacy_sqlite_schema(engine: Engine) -> None:
+    additions = {
+        "users": {
+            "user_type": "VARCHAR(40) NOT NULL DEFAULT 'student'",
+            "course": "VARCHAR(160)",
+            "avatar_url": "VARCHAR(2048)",
+            "is_active": "BOOLEAN NOT NULL DEFAULT 1",
+        },
+        "projects": {
+            "status": "VARCHAR(30) NOT NULL DEFAULT 'active'",
+            "project_type_id": "INTEGER REFERENCES project_types(id) ON DELETE SET NULL",
+            "leader_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+            "start_date": "DATE",
+            "end_date": "DATE",
+            "updated_at": "DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00'",
+        },
+        "tasks": {
+            "stage_id": "INTEGER REFERENCES stages(id) ON DELETE SET NULL",
+            "updated_at": "DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00'",
+        },
+    }
+    with engine.begin() as connection:
+        for table, columns in additions.items():
+            existing = {
+                column["name"] for column in inspect(engine).get_columns(table)
+            }
+            for column, definition in columns.items():
+                if column not in existing:
+                    connection.execute(
+                        text(f'ALTER TABLE "{table}" ADD COLUMN "{column}" {definition}')
+                    )
+                    if column == "updated_at":
+                        connection.execute(
+                            text(
+                                f'UPDATE "{table}" SET updated_at = created_at'
+                            )
+                        )
+
+        member_columns = {
+            column["name"] for column in inspect(engine).get_columns("project_members")
+        }
+        if "id" not in member_columns:
+            connection.execute(
+                text("DROP INDEX IF EXISTS ix_project_members_user_id")
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members RENAME TO project_members_legacy"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE TABLE project_members_new ("
+                    "id INTEGER NOT NULL PRIMARY KEY, "
+                    "project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE, "
+                    "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+                    "role VARCHAR(20) NOT NULL DEFAULT 'member' "
+                    "CHECK (role IN ('leader', 'member')), "
+                    "joined_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "CONSTRAINT uq_project_members_project_user "
+                    "UNIQUE (project_id, user_id))"
+                )
+            )
+            role_value = "role" if "role" in member_columns else "'member'"
+            joined_value = (
+                "joined_at" if "joined_at" in member_columns else "CURRENT_TIMESTAMP"
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO project_members_new (project_id, user_id, role, joined_at) "
+                    "SELECT project_id, user_id, "
+                    f"{role_value}, {joined_value} FROM project_members_legacy"
+                )
+            )
+            connection.execute(text("DROP TABLE project_members_legacy"))
+            connection.execute(
+                text("ALTER TABLE project_members_new RENAME TO project_members")
+            )
+            member_columns = {
+                "id",
+                "project_id",
+                "user_id",
+                "role",
+                "joined_at",
+            }
+        if "role" not in member_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members ADD COLUMN role VARCHAR(20) "
+                    "NOT NULL DEFAULT 'member'"
+                )
+            )
+        if "joined_at" not in member_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members ADD COLUMN joined_at DATETIME "
+                    "NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                )
+            )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_project_members_user_id "
+                "ON project_members (user_id)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_tasks_stage_id ON tasks (stage_id)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_projects_project_type_id "
+                "ON projects (project_type_id)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_projects_leader_id "
+                "ON projects (leader_id)"
+            )
+        )
+        _seed_project_types_and_teams(connection)
+
+
+def _seed_project_types_and_teams(connection) -> None:
+    for name in PROJECT_CATEGORIES:
+        connection.execute(
+            text(
+                "INSERT INTO project_types (name, description) VALUES (:name, '') "
+                "ON CONFLICT (name) DO NOTHING"
+            ),
+            {"name": name},
+        )
+    connection.execute(
+        text(
+            "UPDATE projects SET project_type_id = ("
+            "SELECT id FROM project_types WHERE project_types.name = projects.category"
+            ") WHERE project_type_id IS NULL"
+        )
+    )
+    connection.execute(
+        text("UPDATE projects SET leader_id = owner_id WHERE leader_id IS NULL")
+    )
+    connection.execute(
+        text(
+            "INSERT INTO teams (name, description, project_id) "
+            "SELECT name, '', id FROM projects "
+            "WHERE NOT EXISTS (SELECT 1 FROM teams WHERE teams.project_id = projects.id)"
+        )
+    )
+    connection.execute(
+        text(
+            "INSERT INTO team_members (team_id, user_id, role) "
+            "SELECT teams.id, projects.owner_id, 'leader' "
+            "FROM teams JOIN projects ON projects.id = teams.project_id "
+            "WHERE NOT EXISTS (SELECT 1 FROM team_members "
+            "WHERE team_members.team_id = teams.id AND team_members.user_id = projects.owner_id)"
+        )
+    )
+    connection.execute(
+        text(
+            "INSERT INTO team_members (team_id, user_id, role) "
+            "SELECT teams.id, project_members.user_id, project_members.role "
+            "FROM teams JOIN project_members ON project_members.project_id = teams.project_id "
+            "WHERE NOT EXISTS (SELECT 1 FROM team_members "
+            "WHERE team_members.team_id = teams.id "
+            "AND team_members.user_id = project_members.user_id)"
+        )
+    )
+
+
 def upgrade_legacy_postgres_schema(engine: Engine) -> None:
     if engine.dialect.name != "postgresql":
+        if engine.dialect.name == "sqlite":
+            upgrade_legacy_sqlite_schema(engine)
         return
 
     inspector = inspect(engine)
@@ -171,15 +345,35 @@ def upgrade_legacy_postgres_schema(engine: Engine) -> None:
         "category": "VARCHAR(40) NOT NULL DEFAULT 'Desenvolvimento'",
         "color": "VARCHAR(20) NOT NULL DEFAULT '#6c63ff'",
         "archived": "BOOLEAN NOT NULL DEFAULT FALSE",
+        "status": "VARCHAR(30) NOT NULL DEFAULT 'active'",
+        "project_type_id": "INTEGER",
+        "leader_id": "INTEGER",
+        "start_date": "DATE",
+        "end_date": "DATE",
+        "updated_at": "TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP",
         "owner_id": "INTEGER",
     }
     task_additions = {
         "category": "VARCHAR(40) NOT NULL DEFAULT 'Execução'",
         "deadline": "DATE",
         "assignee_id": "INTEGER",
+        "stage_id": "INTEGER",
+        "updated_at": "TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    }
+    user_columns = {column["name"] for column in inspector.get_columns("users")}
+    user_additions = {
+        "user_type": "VARCHAR(40) NOT NULL DEFAULT 'student'",
+        "course": "VARCHAR(160)",
+        "avatar_url": "VARCHAR(2048)",
+        "is_active": "BOOLEAN NOT NULL DEFAULT TRUE",
     }
 
     with engine.begin() as connection:
+        for column, definition in user_additions.items():
+            if column not in user_columns:
+                connection.execute(
+                    text(f"ALTER TABLE users ADD COLUMN {column} {definition}")
+                )
         for column, definition in project_additions.items():
             if column not in project_columns:
                 connection.execute(
@@ -190,6 +384,56 @@ def upgrade_legacy_postgres_schema(engine: Engine) -> None:
                 connection.execute(
                     text(f"ALTER TABLE tasks ADD COLUMN {column} {definition}")
                 )
+        member_columns = {
+            column["name"] for column in inspector.get_columns("project_members")
+        }
+        if "id" not in member_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members ADD COLUMN id INTEGER "
+                    "GENERATED BY DEFAULT AS IDENTITY"
+                )
+            )
+            old_primary_key = inspect(engine).get_pk_constraint("project_members")
+            old_primary_key_name = old_primary_key.get("name")
+            if old_primary_key_name:
+                connection.execute(
+                    text(
+                        f'ALTER TABLE project_members DROP CONSTRAINT '
+                        f'"{old_primary_key_name}"'
+                    )
+                )
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members ADD CONSTRAINT "
+                    "pk_project_members PRIMARY KEY (id)"
+                )
+            )
+        if "role" not in member_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members ADD COLUMN role VARCHAR(20) "
+                    "NOT NULL DEFAULT 'member'"
+                )
+            )
+        if "joined_at" not in member_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members ADD COLUMN joined_at TIMESTAMPTZ "
+                    "NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                )
+            )
+        member_uniques = {
+            tuple(constraint.get("column_names") or ())
+            for constraint in inspect(engine).get_unique_constraints("project_members")
+        }
+        if ("project_id", "user_id") not in member_uniques:
+            connection.execute(
+                text(
+                    "ALTER TABLE project_members ADD CONSTRAINT "
+                    "uq_project_members_project_user UNIQUE (project_id, user_id)"
+                )
+            )
 
         if "due_date" in task_columns:
             connection.execute(
@@ -207,6 +451,7 @@ def upgrade_legacy_postgres_schema(engine: Engine) -> None:
         connection.execute(
             text("UPDATE projects SET archived = FALSE WHERE archived IS NULL")
         )
+        _seed_project_types_and_teams(connection)
 
         duplicate_emails = connection.execute(
             text(
@@ -309,7 +554,7 @@ def upgrade_legacy_postgres_schema(engine: Engine) -> None:
         "users": ("id",),
         "projects": ("id",),
         "tasks": ("id",),
-        "project_members": ("project_id", "user_id"),
+        "project_members": ("id",),
     }
     for table, expected_columns in expected_primary_keys.items():
         primary_key = inspect(engine).get_pk_constraint(table)
@@ -323,16 +568,32 @@ def upgrade_legacy_postgres_schema(engine: Engine) -> None:
 
     _ensure_foreign_key(engine, "projects", "owner_id", "users", "id")
     _ensure_foreign_key(
+        engine, "projects", "project_type_id", "project_types", "id", "SET NULL"
+    )
+    _ensure_foreign_key(
+        engine, "projects", "leader_id", "users", "id", "SET NULL"
+    )
+    _ensure_foreign_key(
         engine, "tasks", "project_id", "projects", "id", "CASCADE"
     )
     _ensure_foreign_key(
         engine, "tasks", "assignee_id", "users", "id", "SET NULL"
     )
     _ensure_foreign_key(
+        engine, "tasks", "stage_id", "stages", "id", "SET NULL"
+    )
+    _ensure_foreign_key(
         engine, "project_members", "project_id", "projects", "id", "CASCADE"
     )
     _ensure_foreign_key(
         engine, "project_members", "user_id", "users", "id", "CASCADE"
+    )
+    _ensure_check(
+        engine,
+        "project_members",
+        "ck_project_members_role",
+        ("leader", "member"),
+        "role IN ('leader', 'member')",
     )
 
     _ensure_check(
@@ -417,6 +678,20 @@ def upgrade_legacy_postgres_schema(engine: Engine) -> None:
     )
     _ensure_index(
         engine,
+        "ix_projects_project_type_id",
+        "CREATE INDEX ix_projects_project_type_id ON projects (project_type_id)",
+        "projects",
+        ("project_type_id",),
+    )
+    _ensure_index(
+        engine,
+        "ix_projects_leader_id",
+        "CREATE INDEX ix_projects_leader_id ON projects (leader_id)",
+        "projects",
+        ("leader_id",),
+    )
+    _ensure_index(
+        engine,
         "ix_tasks_project_id",
         "CREATE INDEX ix_tasks_project_id ON tasks (project_id)",
         "tasks",
@@ -449,6 +724,13 @@ def upgrade_legacy_postgres_schema(engine: Engine) -> None:
         "CREATE INDEX ix_tasks_deadline ON tasks (deadline)",
         "tasks",
         ("deadline",),
+    )
+    _ensure_index(
+        engine,
+        "ix_tasks_stage_id",
+        "CREATE INDEX ix_tasks_stage_id ON tasks (stage_id)",
+        "tasks",
+        ("stage_id",),
     )
     _ensure_index(
         engine,

@@ -3,11 +3,45 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.dependencies import get_accessible_project, get_current_user
-from app.models import Project, Task, User
-from app.schemas import ProjectCreate, ProjectMemberAdd, ProjectPublic, ProjectUpdate, UserPublic
+from app.models import (
+    Attachment,
+    Project,
+    ProjectMember,
+    ProjectType,
+    Notification,
+    Task,
+    Team,
+    TeamMember,
+    User,
+)
+from app.schemas import (
+    AttachmentPublic,
+    ProjectCreate,
+    ProjectMemberAdd,
+    ProjectPublic,
+    ProjectUpdate,
+    UserPublic,
+)
 from db.session import get_db
 
 router = APIRouter(prefix="/api/projects", tags=["Projetos"])
+
+
+@router.get("/{project_id}/attachments", response_model=list[AttachmentPublic])
+def list_project_attachments(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[Attachment]:
+    project = get_accessible_project(project_id, user, db)
+    return list(
+        db.scalars(
+            select(Attachment)
+            .join(Task, Attachment.task_id == Task.id)
+            .where(Task.project_id == project.id)
+            .order_by(Attachment.created_at.desc())
+        ).all()
+    )
 
 
 def project_response(project: Project) -> ProjectPublic:
@@ -40,7 +74,10 @@ def list_projects(
             Project.archived == archived,
             (Project.owner_id == user.id) | Project.members.any(User.id == user.id),
         )
-        .options(selectinload(Project.members), selectinload(Project.tasks))
+        .options(
+            selectinload(Project.memberships).selectinload(ProjectMember.user),
+            selectinload(Project.tasks),
+        )
         .order_by(Project.created_at.desc())
     ).all()
     return [project_response(project) for project in projects]
@@ -52,7 +89,23 @@ def create_project(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ProjectPublic:
-    project = Project(**data.model_dump(), owner=user)
+    project_type = db.scalar(
+        select(ProjectType).where(ProjectType.name == data.category)
+    )
+    if project_type is None:
+        project_type = ProjectType(name=data.category)
+        db.add(project_type)
+        db.flush()
+    project = Project(
+        **data.model_dump(),
+        owner=user,
+        leader=user,
+        project_type=project_type,
+    )
+    project.team = Team(
+        name=data.name,
+        memberships=[TeamMember(user=user, role="leader")],
+    )
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -104,6 +157,16 @@ def add_project_member(
         raise HTTPException(status_code=404, detail="Não existe uma conta com esse email.")
     if member.id != project.owner_id and member not in project.members:
         project.members.append(member)
+        if project.team is not None:
+            project.team.memberships.append(TeamMember(user=member, role="member"))
+        db.add(
+            Notification(
+                user=member,
+                title="Foste adicionado a um projeto",
+                message=f"Fazes agora parte da equipa «{project.name}».",
+                notification_type="project_invitation",
+            )
+        )
         db.commit()
     return [UserPublic.model_validate(project.owner), *[
         UserPublic.model_validate(item) for item in project.members

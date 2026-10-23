@@ -5,11 +5,76 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.dependencies import get_accessible_project, get_current_user
-from app.models import Project, Task, User
-from app.schemas import TaskCreate, TaskPriority, TaskPublic, TaskStatus, TaskUpdate
+from app.models import Comment, Notification, Project, Task, User
+from app.schemas import (
+    CommentCreate,
+    CommentPublic,
+    TaskCreate,
+    TaskPriority,
+    TaskPublic,
+    TaskStatus,
+    TaskUpdate,
+)
 from db.session import get_db
 
 router = APIRouter(prefix="/api/projects/{project_id}/tasks", tags=["Tarefas"])
+
+
+@router.get("/{task_id}/comments", response_model=list[CommentPublic])
+def list_comments(
+    project_id: int,
+    task_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[Comment]:
+    project = get_accessible_project(project_id, user, db)
+    task = db.scalar(
+        select(Task).where(Task.id == task_id, Task.project_id == project.id)
+    )
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    return list(
+        db.scalars(
+            select(Comment)
+            .where(Comment.task_id == task.id)
+            .options(joinedload(Comment.user))
+            .order_by(Comment.created_at.asc())
+        ).all()
+    )
+
+
+@router.post(
+    "/{task_id}/comments",
+    response_model=CommentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_comment(
+    project_id: int,
+    task_id: int,
+    data: CommentCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Comment:
+    project = get_accessible_project(project_id, user, db)
+    task = db.scalar(
+        select(Task).where(Task.id == task_id, Task.project_id == project.id)
+    )
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    comment = Comment(content=data.content, task=task, user=user)
+    db.add(comment)
+    if task.assignee_id is not None and task.assignee_id != user.id:
+        db.add(
+            Notification(
+                user_id=task.assignee_id,
+                title="Novo comentário numa tarefa",
+                message=f"{user.name} comentou «{task.title}».",
+                notification_type="comment",
+            )
+        )
+    db.commit()
+    db.refresh(comment)
+    return comment
 
 
 def check_assignee(
@@ -65,6 +130,15 @@ def create_task(
     check_assignee(project, assignee_id, db)
     task = Task(**data.model_dump(exclude={"assignee_id"}), project=project, assignee_id=assignee_id)
     db.add(task)
+    if assignee_id is not None and assignee_id != user.id:
+        db.add(
+            Notification(
+                user_id=assignee_id,
+                title="Nova tarefa atribuída",
+                message=f"A tarefa «{task.title}» foi atribuída a ti.",
+                notification_type="task_assigned",
+            )
+        )
     db.commit()
     db.refresh(task)
     saved_task = db.scalar(
@@ -92,10 +166,20 @@ def update_task(
     if task is None:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
     changes = data.model_dump(exclude_unset=True)
+    previous_assignee_id = task.assignee_id
     if "assignee_id" in changes:
         check_assignee(project, changes["assignee_id"], db)
     for key, value in changes.items():
         setattr(task, key, value)
+    if task.assignee_id is not None and task.assignee_id != previous_assignee_id:
+        db.add(
+            Notification(
+                user_id=task.assignee_id,
+                title="Tarefa atribuída a ti",
+                message=f"A tarefa «{task.title}» foi atribuída a ti.",
+                notification_type="task_assigned",
+            )
+        )
     db.commit()
     db.refresh(task)
     saved_task = db.scalar(

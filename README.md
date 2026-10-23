@@ -22,12 +22,20 @@ TaskFlow é uma plataforma web para organizar projetos académicos, distribuir r
 
 O esquema relacional cria e mantém estas tabelas:
 
-- **`users`**: contas, email único e normalizado e hash da palavra-passe.
-- **`projects`**: dados do projeto, responsável obrigatório e estado de arquivo.
-- **`project_members`**: relação muitos-para-muitos entre projetos e membros, sem associações repetidas.
-- **`tasks`**: tarefas associadas a um projeto, com prazo, responsável opcional, prioridade, categoria e estado validados.
+- **`users`**: contas, email único e normalizado, hash da palavra-passe, perfil, curso, avatar e estado ativo.
+- **`projects`**: dados, categoria/tipo, estado e datas, com criador e líder.
+- **`project_types`** e **`project_models`**: tipos de projeto e modelos reutilizáveis com a estrutura das etapas em JSON.
+- **`model_stages`** e **`task_stages`**: etapas ordenadas dos modelos e respetiva associação às tarefas.
+- **`teams`** e **`team_members`**: equipa do projeto e respetivos membros, com papel e data de entrada.
+- **`project_members`**: entidade de associação projeto-utilizador com papel e data de entrada, sem associações repetidas.
+- **`stages`**: etapas opcionais associadas diretamente a projetos existentes.
+- **`tasks`**: tarefas associadas a projetos, com prazo, responsável opcional, etapa opcional, prioridade, categoria e estado.
+- **`comments`** e **`attachments`**: comentários e ficheiros associados a tarefas e aos respetivos autores.
+- **`notifications`**: notificações associadas ao utilizador destinatário.
 
-As chaves estrangeiras preservam a integridade: ao remover um projeto, são removidas as suas tarefas e associações de membros, não as contas dos membros; ao remover um membro, as suas tarefas permanecem e ficam sem responsável. As categorias, estados, prioridades e campos obrigatórios também são verificados na base de dados. No arranque, o backend cria as tabelas em falta e adapta o esquema PostgreSQL antigo sem apagar os dados.
+As chaves estrangeiras preservam a integridade: ao remover um projeto, são removidas as suas tarefas, etapas, equipa e associações de membros, não as contas dos membros; ao remover uma tarefa, são removidos os comentários, anexos e associações a etapas-modelo; ao remover um utilizador responsável por tarefas ou anexos, esses registos permanecem sem responsável. As associações de membros são únicas por projeto/equipa e utilizador. No arranque, o backend cria as tabelas em falta, converte os projetos existentes em tipos e equipas iniciais e adapta os esquemas PostgreSQL e SQLite anteriores sem apagar os dados.
+
+A interface autenticada inclui início com indicadores, lista e detalhe de projetos, tarefas, detalhe da tarefa com comentários, equipa, notificações e calendário mensal. A atribuição de tarefas, convites e comentários geram notificações para os membros relevantes.
 
 ## Executar localmente
 

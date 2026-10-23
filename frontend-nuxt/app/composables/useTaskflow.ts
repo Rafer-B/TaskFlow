@@ -32,6 +32,35 @@ export interface Task {
   created_at: string
 }
 
+export interface Comment {
+  id: number
+  content: string
+  task_id: number
+  user_id: number
+  created_at: string
+  user: User
+}
+
+export interface Notification {
+  id: number
+  title: string
+  message: string
+  notification_type: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface Attachment {
+  id: number
+  file_name: string
+  url: string
+  file_type: string
+  size_bytes: number
+  task_id: number
+  uploaded_by_id: number | null
+  created_at: string
+}
+
 interface AuthResult {
   access_token: string
   user: User
@@ -48,7 +77,17 @@ export function useTaskflow() {
     if (options.body) headers.set('Content-Type', 'application/json')
     if (token.value) headers.set('Authorization', `Bearer ${token.value}`)
 
-    const response = await fetch(`${config.public.apiBase}${path}`, { ...options, headers })
+    let response: Response
+    try {
+      response = await fetch(`${config.public.apiBase}${path}`, { ...options, headers })
+    } catch (cause) {
+      if (cause instanceof TypeError) {
+        throw new Error(
+          'Não foi possível ligar à API. Confirma que o backend está em execução e que o endereço está correto.',
+        )
+      }
+      throw cause
+    }
     if (!response.ok) {
       const body = await response.json().catch(() => null) as { detail?: string } | null
       throw new Error(body?.detail ?? 'Não foi possível concluir o pedido.')

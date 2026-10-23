@@ -153,6 +153,53 @@ class TaskPublic(BaseModel):
     created_at: datetime
 
 
+class CommentCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("content")
+    @classmethod
+    def normalize_content(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("O comentário não pode estar vazio.")
+        return normalized
+
+
+class CommentPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    content: str
+    task_id: int
+    user_id: int
+    created_at: datetime
+    user: UserPublic
+
+
+class NotificationPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    message: str
+    notification_type: str
+    is_read: bool
+    created_at: datetime
+
+
+class AttachmentPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    file_name: str
+    url: str
+    file_type: str
+    size_bytes: int
+    task_id: int
+    uploaded_by_id: int | None
+    created_at: datetime
+
+
 class ProjectTaskList(BaseModel):
     project_id: int
     tasks: list[TaskPublic]

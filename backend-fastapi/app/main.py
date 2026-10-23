@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from api.routes import auth, projects, tasks
+from api.routes import auth, notifications, projects, tasks
 from app import models
 from app.migrations import upgrade_legacy_postgres_schema
 from db.session import Base, engine
@@ -33,6 +33,7 @@ app.add_middleware(
     allow_origins=os.getenv(
         "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
     ).split(","),
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,6 +41,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
+app.include_router(notifications.router)
 
 
 @app.get("/")
