@@ -1,12 +1,28 @@
+import mimetypes
+import os
 from datetime import date
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import FileResponse
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from app.dependencies import get_accessible_project, get_current_user
-from app.models import Comment, Notification, Project, Task, User
+from app.models import Attachment, Comment, Notification, Project, Task, User
 from app.schemas import (
+    AttachmentPublic,
     CommentCreate,
     CommentPublic,
     TaskCreate,
@@ -18,9 +34,120 @@ from app.schemas import (
 from db.session import get_db
 
 router = APIRouter(prefix="/api/projects/{project_id}/tasks", tags=["Tarefas"])
+UPLOAD_DIR = Path(
+    os.getenv("TASKFLOW_UPLOAD_DIR", str(Path(__file__).resolve().parents[2] / "uploads"))
+)
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
 
 # Esta rota aninhada usa o `project_id` como limite de escopo e evita que uma tarefa
 # de outro projeto seja consultada ou editada por acidente.
+
+
+@router.post(
+    "/{task_id}/attachments",
+    response_model=AttachmentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_task_attachment(
+    project_id: int,
+    task_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Attachment:
+    project = get_accessible_project(project_id, user, db)
+    task = db.scalar(
+        select(Task).where(Task.id == task_id, Task.project_id == project.id)
+    )
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+
+    file_name = (file.filename or "").replace("\\", "/").split("/")[-1]
+    file_name = "".join(
+        character for character in file_name if character.isprintable()
+    ).strip()
+    if not file_name:
+        raise HTTPException(status_code=422, detail="O ficheiro tem um nome inválido.")
+    file_name = file_name[:255]
+
+    storage_key = uuid4().hex
+    file_path = UPLOAD_DIR / storage_key
+    size_bytes = 0
+    try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        with file_path.open("wb") as destination:
+            while chunk := await file.read(1024 * 1024):
+                size_bytes += len(chunk)
+                if size_bytes > MAX_ATTACHMENT_SIZE:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail="O ficheiro excede o limite de 10 MB.",
+                    )
+                destination.write(chunk)
+        if size_bytes == 0:
+            raise HTTPException(status_code=422, detail="Não é possível anexar um ficheiro vazio.")
+
+        attachment = Attachment(
+            file_name=file_name,
+            url=f"/api/projects/{project.id}/tasks/{task.id}/attachments/{storage_key}",
+            file_type=mimetypes.guess_type(file_name)[0] or "application/octet-stream",
+            size_bytes=size_bytes,
+            task=task,
+            uploaded_by=user,
+        )
+        db.add(attachment)
+        db.commit()
+        db.refresh(attachment)
+        return attachment
+    except (OSError, SQLAlchemyError):
+        db.rollback()
+        file_path.unlink(missing_ok=True)
+        raise
+    except HTTPException:
+        file_path.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
+
+
+@router.get("/{task_id}/attachments/{storage_key}")
+def download_task_attachment(
+    project_id: int,
+    task_id: int,
+    storage_key: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    project = get_accessible_project(project_id, user, db)
+    task = db.scalar(
+        select(Task).where(Task.id == task_id, Task.project_id == project.id)
+    )
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    if len(storage_key) != 32 or any(
+        character not in "0123456789abcdef" for character in storage_key
+    ):
+        raise HTTPException(status_code=404, detail="Anexo não encontrado.")
+    attachment = db.scalar(
+        select(Attachment).where(
+            Attachment.task_id == task.id,
+            Attachment.url
+            == f"/api/projects/{project.id}/tasks/{task.id}/attachments/{storage_key}",
+        )
+    )
+    if attachment is None:
+        raise HTTPException(status_code=404, detail="Anexo não encontrado.")
+
+    file_path = UPLOAD_DIR / storage_key
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Ficheiro do anexo não encontrado.")
+    return FileResponse(
+        file_path,
+        media_type=attachment.file_type,
+        filename=attachment.file_name,
+        content_disposition_type="attachment",
+    )
+
 
 @router.get("/{task_id}/comments", response_model=list[CommentPublic])
 def list_comments(

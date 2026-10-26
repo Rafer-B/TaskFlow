@@ -53,6 +53,8 @@ uvicorn app.main:app --reload
 
 A API fica disponível em `http://localhost:8000`; a documentação interativa está em `http://localhost:8000/docs`. Sem `DATABASE_URL` nem variáveis `DB_*`, os dados ficam em `backend-fastapi/taskflow.db`.
 
+Os anexos enviados nos detalhes das tarefas têm um limite de 10 MB e são guardados em `backend-fastapi/uploads` por predefinição. Em ambientes persistentes, configura `TASKFLOW_UPLOAD_DIR` para um diretório duradouro e inclui esse diretório nas cópias de segurança.
+
 Para usar PostgreSQL, configura no ficheiro `backend-fastapi/.env` as variáveis do formato URL:
 
 ```dotenv

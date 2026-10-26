@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="clock" x1="39" y1="34" x2="91" y2="93" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9FB0"/>
+      <stop offset="1" stop-color="#E66B83"/>
+    </linearGradient>
+    <filter id="shadow" x="17" y="25" width="95" height="93" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="#EF8195" fill-opacity=".08"/>
+  <circle cx="102" cy="38" r="4" fill="#F4A5B3"/>
+  <circle cx="23" cy="76" r="3" fill="#F8C2CB"/>
+  <ellipse cx="64" cy="102" fill="#B44F66" fill-opacity=".15" filter="url(#shadow)" rx="39" ry="8"/>
+  <circle cx="62" cy="62" r="33" fill="url(#clock)"/>
+  <circle cx="62" cy="62" r="25" fill="#fff"/>
+  <circle cx="62" cy="62" r="21" fill="#FFF4F5"/>
+  <path d="M62 48v15l10 6" stroke="#DF7387" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+  <circle cx="62" cy="62" r="3" fill="#DF7387"/>
+  <path d="M48 27h28" stroke="#E66B83" stroke-linecap="round" stroke-width="5"/>
+  <path d="m91 75 14 25a5 5 0 0 1-4 7H73a5 5 0 0 1-4-7l14-25a5 5 0 0 1 8 0Z" fill="#fff"/>
+  <path d="M87 86v8" stroke="#E66B83" stroke-linecap="round" stroke-width="3"/>
+  <circle cx="87" cy="99" r="1.8" fill="#E66B83"/>
+  <path d="m30 39 2-4 2 4 4 2-4 2-2 4-2-4-4-2 4-2Z" fill="#F2A0AE"/>
+</svg>

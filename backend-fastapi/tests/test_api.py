@@ -1,4 +1,7 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
@@ -396,6 +399,44 @@ class TaskFlowApiTests(unittest.TestCase):
         )
         self.assertEqual(marked_read.status_code, 200)
         self.assertTrue(marked_read.json()["is_read"])
+
+    def test_task_attachment_upload_and_download(self) -> None:
+        token, _owner_id = self.register("Anexos", "anexos@example.pt")
+        headers = {"Authorization": f"Bearer {token}"}
+        project = self.client.post(
+            "/api/projects",
+            headers=headers,
+            json={"name": "Projeto com anexos"},
+        ).json()
+        task = self.client.post(
+            f"/api/projects/{project['id']}/tasks",
+            headers=headers,
+            json={"title": "Rever documento"},
+        ).json()
+        upload_path = f"/api/projects/{project['id']}/tasks/{task['id']}/attachments"
+        content = b"Conteudo de teste do anexo."
+
+        with TemporaryDirectory() as upload_dir, patch(
+            "api.routes.tasks.UPLOAD_DIR", Path(upload_dir)
+        ):
+            uploaded = self.client.post(
+                upload_path,
+                headers=headers,
+                files={"file": ("resumo.txt", content, "text/plain")},
+            )
+            self.assertEqual(uploaded.status_code, 201, uploaded.text)
+            attachment = uploaded.json()
+            self.assertEqual(attachment["file_name"], "resumo.txt")
+            self.assertEqual(attachment["size_bytes"], len(content))
+            self.assertEqual(attachment["task_id"], task["id"])
+
+            downloaded = self.client.get(attachment["url"], headers=headers)
+            self.assertEqual(downloaded.status_code, 200, downloaded.text)
+            self.assertEqual(downloaded.content, content)
+            self.assertIn("attachment", downloaded.headers["content-disposition"])
+
+            unauthenticated = self.client.get(attachment["url"])
+            self.assertEqual(unauthenticated.status_code, 401)
 
     def test_legacy_sqlite_schema_is_upgraded_without_losing_members(self) -> None:
         engine = create_engine(

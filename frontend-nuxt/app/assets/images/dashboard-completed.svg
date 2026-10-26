@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="badge" x1="39" y1="37" x2="92" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#73D9B1"/>
+      <stop offset="1" stop-color="#38AD86"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="47" y1="76" x2="79" y2="108" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#54C49A"/>
+      <stop offset="1" stop-color="#289A73"/>
+    </linearGradient>
+    <filter id="shadow" x="20" y="24" width="91" height="95" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <circle cx="65" cy="63" r="54" fill="#52C39A" fill-opacity=".09"/>
+  <path d="m33 31 13 9 1 37-15 12-2-36 3-22Z" fill="#A4E8CD"/>
+  <path d="m94 31-13 9-1 37 15 12 2-36-3-22Z" fill="#8ADFC0"/>
+  <ellipse cx="65" cy="103" fill="#20845F" fill-opacity=".14" filter="url(#shadow)" rx="37" ry="8"/>
+  <path d="m48 76 1 31 16-10 16 10 1-31" fill="url(#ribbon)"/>
+  <circle cx="65" cy="59" r="32" fill="#fff"/>
+  <circle cx="65" cy="59" r="27" fill="url(#badge)"/>
+  <circle cx="65" cy="59" r="21" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+  <path d="m52 59 9 9 18-20" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="6"/>
+  <path d="m24 46 3-6 3 6 6 3-6 3-3 6-3-6-6-3 6-3Zm76 22 2-4 2 4 4 2-4 2-2 4-2-4-4-2 4-2Z" fill="#66CBA7"/>
+  <circle cx="102" cy="37" r="3" fill="#A6E8D0"/>
+</svg>

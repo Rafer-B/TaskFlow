@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import completedIllustration from '~/assets/images/dashboard-completed.svg'
+import overdueIllustration from '~/assets/images/dashboard-overdue.svg'
+import pendingIllustration from '~/assets/images/dashboard-pending.svg'
+import projectsIllustration from '~/assets/images/dashboard-projects.svg'
 import type { Attachment, Comment, Notification, Project, Task, User } from '~/composables/useTaskflow'
 
-const { token, user, request, authenticate, restoreSession, signOut } = useTaskflow()
+const { token, user, request, downloadFile, authenticate, restoreSession, signOut } = useTaskflow()
 // Estado de domínio e de navegação; `ref` permite que as alterações atualizem a vista.
 const projects = ref<Project[]>([])
 const tasks = ref<Task[]>([])
@@ -12,6 +16,8 @@ const attachments = ref<Attachment[]>([])
 const activeProjectId = ref<number | null>(null)
 const activeView = ref<'overview' | 'projects' | 'project' | 'tasks' | 'calendar' | 'team' | 'documents' | 'notifications' | 'task'>('projects')
 const selectedTaskId = ref<number | null>(null)
+const attachmentInput = ref<HTMLInputElement | null>(null)
+const uploadingAttachment = ref(false)
 const commentDraft = ref('')
 const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const showArchivedProjects = ref(false)
@@ -426,6 +432,41 @@ async function addComment() {
   }
 }
 
+async function uploadAttachment(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  const task = selectedTask.value
+  input.value = ''
+  if (!file || !task) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+  uploadingAttachment.value = true
+  clearMessages()
+  try {
+    const attachment = await request<Attachment>(
+      `/api/projects/${task.project_id}/tasks/${task.id}/attachments`,
+      { method: 'POST', body: formData },
+    )
+    attachments.value = [attachment, ...attachments.value]
+    notice.value = 'Anexo carregado.'
+  } catch (cause) {
+    setError(cause)
+  } finally {
+    uploadingAttachment.value = false
+  }
+}
+
+async function downloadAttachment(event: MouseEvent, attachment: Attachment) {
+  if (!attachment.url.startsWith('/api/')) return
+  event.preventDefault()
+  try {
+    await downloadFile(attachment.url, attachment.file_name)
+  } catch (cause) {
+    setError(cause)
+  }
+}
+
 async function markNotificationRead(notification: Notification) {
   if (notification.is_read) return
   try {
@@ -617,10 +658,10 @@ function handleSignOut() {
             <div class="intro-actions"><button class="button button-primary" @click="openProjectForm()">＋ Novo projeto</button></div>
           </div>
           <section class="stats-grid">
-            <article class="stat-card"><div class="stat-top"><span class="stat-icon icon-violet">▤</span><span class="stat-caption">PROJETOS ATIVOS</span></div><div class="stat-value">{{ projects.length }}</div><div class="stat-foot">Os teus espaços de trabalho</div></article>
-            <article class="stat-card"><div class="stat-top"><span class="stat-icon icon-amber">◷</span><span class="stat-caption">TAREFAS PENDENTES</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status !== 'done').length }}</div><div class="stat-foot">Em todos os projetos</div></article>
-            <article class="stat-card"><div class="stat-top"><span class="stat-icon icon-green">✓</span><span class="stat-caption">CONCLUÍDAS</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status === 'done').length }}</div><div class="stat-foot"><span class="positive-dot"></span> Cada passo conta</div></article>
-            <article class="stat-card"><div class="stat-top"><span class="stat-icon icon-rose">!</span><span class="stat-caption">TAREFAS EM ATRASO</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.deadline && task.deadline < today && task.status !== 'done').length }}</div><div class="stat-foot">Precisam da tua atenção</div></article>
+            <article class="stat-card stat-card-projects"><img class="stat-illustration" :src="projectsIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">PROJETOS ATIVOS</span></div><div class="stat-value">{{ projects.length }}</div><div class="stat-foot">Os teus espaços de trabalho</div></article>
+            <article class="stat-card stat-card-pending"><img class="stat-illustration" :src="pendingIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">TAREFAS PENDENTES</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status !== 'done').length }}</div><div class="stat-foot">Em todos os projetos</div></article>
+            <article class="stat-card stat-card-completed"><img class="stat-illustration" :src="completedIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">CONCLUÍDAS</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status === 'done').length }}</div><div class="stat-foot"><span class="positive-dot"></span> Cada passo conta</div></article>
+            <article class="stat-card stat-card-overdue"><img class="stat-illustration" :src="overdueIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">TAREFAS EM ATRASO</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.deadline && task.deadline < today && task.status !== 'done').length }}</div><div class="stat-foot">Precisam da tua atenção</div></article>
           </section>
           <section class="tasks-section overview-tasks">
             <div class="section-header"><div><span class="section-kicker">PRÓXIMOS PASSOS</span><h2>Tarefas próximas do prazo</h2></div><button class="text-button" @click="activeView = 'tasks'">Ver todas →</button></div>
@@ -737,7 +778,7 @@ function handleSignOut() {
         <!-- Os anexos pertencem ao projeto ativo e são apresentados como ligações para os ficheiros. -->
         <template v-else-if="activeView === 'documents'">
           <div class="page-intro"><div class="page-title-group"><span class="eyebrow">FICHEIROS DO PROJETO</span><h1>Documentos</h1><p>{{ activeProject?.name ?? 'Seleciona um projeto para consultar os documentos.' }}</p></div></div>
-          <div v-if="attachments.length" class="document-list"><a v-for="attachment in attachments" :key="attachment.id" class="document-card" :href="attachment.url" target="_blank" rel="noopener noreferrer"><span class="document-icon">↗</span><span><strong>{{ attachment.file_name }}</strong><small>{{ attachment.file_type }} · {{ (attachment.size_bytes / 1024).toFixed(1) }} KB</small></span><span class="document-task">{{ dashboardTasks.find((task) => task.id === attachment.task_id)?.title ?? 'Tarefa' }}</span></a></div>
+          <div v-if="attachments.length" class="document-list"><a v-for="attachment in attachments" :key="attachment.id" class="document-card" :href="attachment.url" target="_blank" rel="noopener noreferrer" @click="downloadAttachment($event, attachment)"><span class="document-icon">↗</span><span><strong>{{ attachment.file_name }}</strong><small>{{ attachment.file_type }} · {{ (attachment.size_bytes / 1024).toFixed(1) }} KB</small></span><span class="document-task">{{ dashboardTasks.find((task) => task.id === attachment.task_id)?.title ?? 'Tarefa' }}</span></a></div>
           <div v-else class="empty-state"><span class="empty-icon">▤</span><h3>Sem documentos anexados.</h3><p>Os ficheiros associados às tarefas deste projeto serão apresentados aqui.</p><button class="button button-soft" @click="activeView = 'project'">Voltar ao projeto</button></div>
         </template>
 
@@ -773,14 +814,15 @@ function handleSignOut() {
                 <section class="task-detail-section task-attachments-section">
                   <header><h2><span aria-hidden="true">⌁</span> Anexos <span>({{ selectedTaskAttachments.length }})</span></h2><button v-if="selectedTaskAttachments.length" class="task-detail-more" aria-label="Ver todos os anexos" @click="openDocuments()">•••</button></header>
                   <div v-if="selectedTaskAttachments.length" class="task-attachment-list">
-                    <a v-for="attachment in selectedTaskAttachments" :key="attachment.id" class="task-attachment" :href="attachment.url" target="_blank" rel="noopener noreferrer" :download="attachment.file_name">
+                    <a v-for="attachment in selectedTaskAttachments" :key="attachment.id" class="task-attachment" :href="attachment.url" target="_blank" rel="noopener noreferrer" :download="attachment.file_name" @click="downloadAttachment($event, attachment)">
                       <span class="task-attachment-icon">↧</span>
                       <span class="task-attachment-copy"><strong>{{ attachment.file_name }}</strong><small>{{ formatFileSize(attachment.size_bytes) }} · {{ attachment.file_type }}</small></span>
                       <span class="task-attachment-download" aria-label="Transferir anexo">↓</span>
                     </a>
                   </div>
                   <p v-else class="task-detail-empty">Ainda não existem anexos nesta tarefa.</p>
-                  <button class="task-attachment-upload" disabled title="O envio de ficheiros ainda não está disponível">＋ Envio de anexos indisponível</button>
+                  <input ref="attachmentInput" class="sr-only" type="file" aria-label="Selecionar anexo" @change="uploadAttachment">
+                  <button class="task-attachment-upload" type="button" :disabled="uploadingAttachment" :title="uploadingAttachment ? 'A carregar ficheiro…' : 'Tamanho máximo: 10 MB'" @click="attachmentInput?.click()">{{ uploadingAttachment ? 'A carregar anexo…' : '＋ Adicionar anexo' }}</button>
                 </section>
 
                 <section class="task-detail-section task-comments-section">

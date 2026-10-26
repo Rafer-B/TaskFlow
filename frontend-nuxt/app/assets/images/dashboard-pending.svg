@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="board" x1="37" y1="32" x2="94" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD477"/>
+      <stop offset="1" stop-color="#F2A742"/>
+    </linearGradient>
+    <linearGradient id="sheet" x1="42" y1="41" x2="91" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#FFF8EA"/>
+    </linearGradient>
+    <filter id="shadow" x="18" y="27" width="96" height="91" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <circle cx="65" cy="65" r="54" fill="#F5B84D" fill-opacity=".1"/>
+  <circle cx="101" cy="39" r="3" fill="#F4BC62"/>
+  <circle cx="24" cy="78" r="4" fill="#FFDA98"/>
+  <ellipse cx="66" cy="103" fill="#C77821" fill-opacity=".16" filter="url(#shadow)" rx="37" ry="8"/>
+  <rect x="34" y="34" width="61" height="68" rx="12" fill="url(#board)"/>
+  <rect x="41" y="42" width="47" height="53" rx="8" fill="url(#sheet)"/>
+  <rect x="52" y="28" width="26" height="15" rx="7.5" fill="#E99531"/>
+  <rect x="58" y="32" width="14" height="7" rx="3.5" fill="#FFF1D4"/>
+  <rect x="49" y="53" width="9" height="9" rx="3" fill="#FFF0D4"/>
+  <path d="m51 57 2 2 4-5" stroke="#E7A23F" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
+  <path d="M63 57h17" stroke="#D9D6D0" stroke-linecap="round" stroke-width="3"/>
+  <rect x="49" y="68" width="9" height="9" rx="3" fill="#FFF0D4"/>
+  <path d="m51 72 2 2 4-5" stroke="#E7A23F" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
+  <path d="M63 72h17" stroke="#D9D6D0" stroke-linecap="round" stroke-width="3"/>
+  <rect x="49" y="83" width="9" height="9" rx="3" fill="#FFF0D4"/>
+  <path d="M63 87h12" stroke="#D9D6D0" stroke-linecap="round" stroke-width="3"/>
+  <circle cx="91" cy="83" r="19" fill="#fff"/>
+  <circle cx="91" cy="83" r="14" fill="#FFF3DC"/>
+  <path d="M91 75v9l6 4" stroke="#E8A03B" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+</svg>

@@ -77,7 +77,9 @@ export function useTaskflow() {
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = new Headers(options.headers)
     headers.set('Accept', 'application/json')
-    if (options.body) headers.set('Content-Type', 'application/json')
+    if (options.body && !(typeof FormData !== 'undefined' && options.body instanceof FormData)) {
+      headers.set('Content-Type', 'application/json')
+    }
     if (token.value) headers.set('Authorization', `Bearer ${token.value}`)
 
     let response: Response
@@ -98,6 +100,36 @@ export function useTaskflow() {
     // Respostas 204 não têm corpo JSON; o cast adapta esse caso ao tipo genérico do pedido.
     if (response.status === 204) return undefined as T
     return response.json() as Promise<T>
+  }
+
+  async function downloadFile(path: string, fileName: string) {
+    const headers = new Headers({ Accept: '*/*' })
+    if (token.value) headers.set('Authorization', `Bearer ${token.value}`)
+
+    let response: Response
+    try {
+      response = await fetch(`${config.public.apiBase}${path}`, { headers })
+    } catch (cause) {
+      if (cause instanceof TypeError) {
+        throw new Error(
+          'Não foi possível ligar à API. Confirma que o backend está em execução e que o endereço está correto.',
+        )
+      }
+      throw cause
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { detail?: string } | null
+      throw new Error(body?.detail ?? 'Não foi possível transferir o anexo.')
+    }
+
+    const objectUrl = URL.createObjectURL(await response.blob())
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = fileName
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
   }
 
   // Login e registo partilham o endpoint, guardando o token só no navegador.
@@ -132,5 +164,5 @@ export function useTaskflow() {
     if (import.meta.client) localStorage.removeItem('taskflow-token')
   }
 
-  return { token, user, request, authenticate, restoreSession, signOut }
+  return { token, user, request, downloadFile, authenticate, restoreSession, signOut }
 }

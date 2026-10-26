@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="folder" x1="27" y1="38" x2="94" y2="93" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9A8CFF"/>
+      <stop offset="1" stop-color="#6859E8"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="49" y1="35" x2="88" y2="81" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#E9E7FF"/>
+    </linearGradient>
+    <filter id="shadow" x="14" y="25" width="104" height="91" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <circle cx="67" cy="65" r="54" fill="#8C7CF5" fill-opacity=".08"/>
+  <circle cx="104" cy="34" r="4" fill="#A89BFF"/>
+  <circle cx="24" cy="76" r="3" fill="#C1B9FF"/>
+  <ellipse cx="65" cy="102" fill="#5548C9" fill-opacity=".16" filter="url(#shadow)" rx="40" ry="8"/>
+  <path d="M24 50a9 9 0 0 1 9-9h19l9 9h34a9 9 0 0 1 9 9v30a9 9 0 0 1-9 9H33a9 9 0 0 1-9-9V50Z" fill="url(#folder)"/>
+  <path d="M34 55a7 7 0 0 1 7-7h48a7 7 0 0 1 7 7v29a7 7 0 0 1-7 7H41a7 7 0 0 1-7-7V55Z" fill="#7667EF"/>
+  <rect x="47" y="31" width="39" height="48" rx="8" transform="rotate(7 47 31)" fill="#5145C4" fill-opacity=".13"/>
+  <rect x="52" y="28" width="39" height="48" rx="8" transform="rotate(7 52 28)" fill="url(#paper)"/>
+  <path d="m62 43 4 4 7-7m-9 14 4 4 7-7m-9 14 4 4 7-7" stroke="#8174E9" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+  <path d="M23 71h82l-7 21a8 8 0 0 1-8 6H35a8 8 0 0 1-8-6l-4-21Z" fill="url(#folder)"/>
+  <rect x="87" y="49" width="19" height="19" rx="7" fill="#fff"/>
+  <path d="M96.5 54v9m-4.5-4.5h9" stroke="#6A5BE5" stroke-linecap="round" stroke-width="2"/>
+</svg>
