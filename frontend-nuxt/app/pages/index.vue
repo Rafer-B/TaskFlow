@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import completedIllustration from '~/assets/images/dashboard-completed.svg'
-import overdueIllustration from '~/assets/images/dashboard-overdue.svg'
-import pendingIllustration from '~/assets/images/dashboard-pending.svg'
-import projectsIllustration from '~/assets/images/dashboard-projects.svg'
+import completedIllustration from '~/assets/images/dashboard-completed-modern.svg'
+import overdueIllustration from '~/assets/images/dashboard-overdue-modern.svg'
+import pendingIllustration from '~/assets/images/dashboard-pending-modern.svg'
+import projectsIllustration from '~/assets/images/dashboard-projects-modern.svg'
 import type { Attachment, Comment, Notification, Project, Task, User } from '~/composables/useTaskflow'
 
 const { token, user, request, downloadFile, authenticate, restoreSession, signOut } = useTaskflow()
@@ -658,10 +658,10 @@ function handleSignOut() {
             <div class="intro-actions"><button class="button button-primary" @click="openProjectForm()">＋ Novo projeto</button></div>
           </div>
           <section class="stats-grid">
-            <article class="stat-card stat-card-projects"><img class="stat-illustration" :src="projectsIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">PROJETOS ATIVOS</span></div><div class="stat-value">{{ projects.length }}</div><div class="stat-foot">Os teus espaços de trabalho</div></article>
-            <article class="stat-card stat-card-pending"><img class="stat-illustration" :src="pendingIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">TAREFAS PENDENTES</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status !== 'done').length }}</div><div class="stat-foot">Em todos os projetos</div></article>
-            <article class="stat-card stat-card-completed"><img class="stat-illustration" :src="completedIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">CONCLUÍDAS</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status === 'done').length }}</div><div class="stat-foot"><span class="positive-dot"></span> Cada passo conta</div></article>
-            <article class="stat-card stat-card-overdue"><img class="stat-illustration" :src="overdueIllustration" alt="" aria-hidden="true"><div class="stat-top"><span class="stat-caption">TAREFAS EM ATRASO</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.deadline && task.deadline < today && task.status !== 'done').length }}</div><div class="stat-foot">Precisam da tua atenção</div></article>
+            <article class="stat-card stat-card-modern stat-card-projects"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="projectsIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">PROJETOS ATIVOS</span></div><div class="stat-value">{{ projects.length }}</div><div class="stat-foot">Os teus espaços de trabalho</div></article>
+            <article class="stat-card stat-card-modern stat-card-pending"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="pendingIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">TAREFAS PENDENTES</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status !== 'done').length }}</div><div class="stat-foot">Em todos os projetos</div></article>
+            <article class="stat-card stat-card-modern stat-card-completed"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="completedIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">CONCLUÍDAS</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status === 'done').length }}</div><div class="stat-foot"><span class="positive-dot"></span> Cada passo conta</div></article>
+            <article class="stat-card stat-card-modern stat-card-overdue"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="overdueIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">TAREFAS EM ATRASO</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.deadline && task.deadline < today && task.status !== 'done').length }}</div><div class="stat-foot">Precisam da tua atenção</div></article>
           </section>
           <section class="tasks-section overview-tasks">
             <div class="section-header"><div><span class="section-kicker">PRÓXIMOS PASSOS</span><h2>Tarefas próximas do prazo</h2></div><button class="text-button" @click="activeView = 'tasks'">Ver todas →</button></div>

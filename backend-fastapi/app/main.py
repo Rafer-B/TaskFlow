@@ -15,7 +15,7 @@ from sqlalchemy import text
 # Importar os routers regista os endpoints de cada área. `models` é importado
 # para que as classes ORM sejam conhecidas por `Base.metadata` antes da criação
 # das tabelas.
-from api.routes import auth, notifications, projects, tasks
+from api.routes import auth, dashboard, notifications, projects, tasks
 from app import models
 from app.migrations import upgrade_legacy_postgres_schema
 from db.session import Base, engine
@@ -72,6 +72,7 @@ app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(notifications.router)
+app.include_router(dashboard.router)
 
 
 # `@app.get("/")` associa esta função a pedidos HTTP GET para a raiz da API.
