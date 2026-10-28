@@ -1,4 +1,5 @@
 import unittest
+from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -557,6 +558,66 @@ class TaskFlowApiTests(unittest.TestCase):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"api": "online", "database": "online"})
+
+    def test_dashboard_stats_aggregate_only_accessible_tasks(self) -> None:
+        token, _owner_id = self.register("Dashboard", "dashboard@example.pt")
+        headers = {"Authorization": f"Bearer {token}"}
+        project = self.client.post(
+            "/api/projects",
+            headers=headers,
+            json={"name": "Projeto dashboard"},
+        ).json()
+
+        for payload in (
+            {"title": "Concluída", "status": "done", "priority": "high"},
+            {
+                "title": "Em atraso",
+                "status": "todo",
+                "priority": "low",
+                "deadline": "2000-01-01",
+            },
+            {
+                "title": "Próxima",
+                "status": "in_progress",
+                "priority": "medium",
+                "deadline": date.today().isoformat(),
+            },
+        ):
+            response = self.client.post(
+                f"/api/projects/{project['id']}/tasks", headers=headers, json=payload
+            )
+            self.assertEqual(response.status_code, 201, response.text)
+
+        other_token, _ = self.register("Outro", "outro-dashboard@example.pt")
+        other_headers = {"Authorization": f"Bearer {other_token}"}
+        other_project = self.client.post(
+            "/api/projects", headers=other_headers, json={"name": "Projeto privado"}
+        ).json()
+        self.client.post(
+            f"/api/projects/{other_project['id']}/tasks",
+            headers=other_headers,
+            json={"title": "Tarefa privada", "status": "blocked"},
+        )
+
+        response = self.client.get("/api/dashboard/stats", headers=headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        stats = response.json()
+        self.assertEqual(stats["projects_total"], 1)
+        self.assertEqual(stats["tasks_total"], 3)
+        self.assertEqual(stats["tasks_done"], 1)
+        self.assertEqual(stats["tasks_overdue"], 1)
+        self.assertEqual(stats["completion_rate"], 33)
+        self.assertEqual(
+            stats["tasks_by_status"],
+            [
+                {"status": "todo", "count": 1},
+                {"status": "in_progress", "count": 1},
+                {"status": "done", "count": 1},
+                {"status": "blocked", "count": 0},
+            ],
+        )
+        self.assertEqual(len(stats["upcoming_deadlines"]), 1)
+        self.assertEqual(stats["upcoming_deadlines"][0]["title"], "Próxima")
 
     def test_private_routes_require_authentication(self) -> None:
         response = self.client.get("/api/projects")

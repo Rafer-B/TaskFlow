@@ -1,8 +1,4 @@
-<script setup lang="ts">
-import completedIllustration from '~/assets/images/dashboard-completed-modern.svg'
-import overdueIllustration from '~/assets/images/dashboard-overdue-modern.svg'
-import pendingIllustration from '~/assets/images/dashboard-pending-modern.svg'
-import projectsIllustration from '~/assets/images/dashboard-projects-modern.svg'
+﻿<script setup lang="ts">
 import type { Attachment, Comment, Notification, Project, Task, User } from '~/composables/useTaskflow'
 
 const { token, user, request, downloadFile, authenticate, restoreSession, signOut } = useTaskflow()
@@ -14,7 +10,7 @@ const comments = ref<Comment[]>([])
 const notifications = ref<Notification[]>([])
 const attachments = ref<Attachment[]>([])
 const activeProjectId = ref<number | null>(null)
-const activeView = ref<'overview' | 'projects' | 'project' | 'tasks' | 'calendar' | 'team' | 'documents' | 'notifications' | 'task'>('projects')
+const activeView = ref<'projects' | 'project' | 'tasks' | 'calendar' | 'team' | 'documents' | 'notifications' | 'task'>('projects')
 const selectedTaskId = ref<number | null>(null)
 const attachmentInput = ref<HTMLInputElement | null>(null)
 const uploadingAttachment = ref(false)
@@ -96,7 +92,6 @@ const visibleTasks = computed(() => tasks.value.filter((task) => {
 }))
 const completedTasks = computed(() => tasks.value.filter((task) => task.status === 'done').length)
 const progress = computed(() => tasks.value.length ? Math.round(completedTasks.value / tasks.value.length * 100) : 0)
-const overdueTasks = computed(() => tasks.value.filter((task) => task.deadline && task.deadline < today && task.status !== 'done').length)
 const initials = computed(() => user.value?.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() ?? 'TF')
 // Os indicadores do resumo combinam tarefas de todos os projetos; a vista de detalhe usa `tasks`.
 const projectDashboardStats = computed(() => ({
@@ -613,7 +608,7 @@ function handleSignOut() {
       <NuxtLink to="/" class="brand"><span class="brand-mark">TF</span><span>taskflow<span class="brand-period">.</span></span></NuxtLink>
       <div class="workspace-label"><span class="workspace-avatar">A</span><span><strong>ARROW4D</strong><small>Workspace académico</small></span><span class="chevron">⌄</span></div>
       <div class="nav-heading">MENU</div>
-      <button class="nav-link" :class="{ active: activeView === 'overview' }" @click="activeView = 'overview'"><span class="nav-icon">▦</span> Início</button>
+      <NuxtLink to="/dashboard" class="nav-link"><span class="nav-icon">✦</span> Dashboard</NuxtLink>
       <button class="nav-link" :class="{ active: activeView === 'projects' }" @click="activeView = 'projects'"><span class="nav-icon">▤</span> Projetos</button>
       <button class="nav-link" :class="{ active: activeView === 'tasks' }" @click="activeView = 'tasks'"><span class="nav-icon">✓</span> Tarefas</button>
       <button class="nav-link" :class="{ active: activeView === 'calendar' }" @click="activeView = 'calendar'"><span class="nav-icon">▦</span> Calendário</button>
@@ -638,7 +633,7 @@ function handleSignOut() {
       <header class="topbar">
         <div v-if="activeView === 'projects'" class="projects-top-heading"><strong>Projetos</strong><small>Gere e acompanha os teus projetos ativos</small></div>
         <div v-else-if="activeView === 'project' && activeProject" class="projects-top-heading project-detail-breadcrumb"><button @click="activeView = 'projects'">Projetos</button><span>/</span><strong>Detalhes do projeto</strong></div>
-        <div v-else class="breadcrumb"><span>Workspace</span><span class="crumb-sep">/</span><strong>{{ ['project', 'documents'].includes(activeView) ? activeProject?.name : ({ overview: 'Início', projects: 'Projetos', tasks: 'Tarefas', calendar: 'Calendário', team: 'Equipa', documents: 'Documentos', notifications: 'Notificações', task: 'Detalhe da tarefa' }[activeView] ?? 'Início') }}</strong></div>
+        <div v-else class="breadcrumb"><span>Workspace</span><span class="crumb-sep">/</span><strong>{{ ['project', 'documents'].includes(activeView) ? activeProject?.name : ({ projects: 'Projetos', tasks: 'Tarefas', calendar: 'Calendário', team: 'Equipa', documents: 'Documentos', notifications: 'Notificações', task: 'Detalhe da tarefa' }[activeView] ?? 'Projetos') }}</strong></div>
         <div class="topbar-actions">
           <label v-if="activeView === 'projects'" class="projects-top-search"><span aria-hidden="true">⌕</span><input v-model="projectSearch" placeholder="Pesquisar..." aria-label="Pesquisar projetos"></label>
           <span v-else class="today-label">{{ new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()) }}</span>
@@ -650,45 +645,8 @@ function handleSignOut() {
       <div class="page-content">
         <div v-if="error" class="message message-error global-message"><span>{{ error }}</span><button @click="clearMessages">×</button></div>
         <div v-if="notice" class="message message-success global-message"><span>{{ notice }}</span><button @click="notice = ''">×</button></div>
-
-        <!-- Resumo transversal: estatísticas e prazos são calculados sobre todas as tarefas acessíveis. -->
-        <template v-if="activeView === 'overview'">
-          <div class="page-intro">
-            <div class="page-title-group"><span class="eyebrow"><span class="eyebrow-dot"></span> O TEU ESPAÇO DE TRABALHO</span><h1>Olá, {{ user.name.split(' ')[0] }}!</h1><p>Aqui está o resumo dos teus projetos e do que merece atenção.</p></div>
-            <div class="intro-actions"><button class="button button-primary" @click="openProjectForm()">＋ Novo projeto</button></div>
-          </div>
-          <section class="stats-grid">
-            <article class="stat-card stat-card-modern stat-card-projects"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="projectsIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">PROJETOS ATIVOS</span></div><div class="stat-value">{{ projects.length }}</div><div class="stat-foot">Os teus espaços de trabalho</div></article>
-            <article class="stat-card stat-card-modern stat-card-pending"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="pendingIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">TAREFAS PENDENTES</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status !== 'done').length }}</div><div class="stat-foot">Em todos os projetos</div></article>
-            <article class="stat-card stat-card-modern stat-card-completed"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="completedIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">CONCLUÍDAS</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.status === 'done').length }}</div><div class="stat-foot"><span class="positive-dot"></span> Cada passo conta</div></article>
-            <article class="stat-card stat-card-modern stat-card-overdue"><div class="stat-illustration-wrapper"><img class="stat-illustration" :src="overdueIllustration" alt="" aria-hidden="true"></div><div class="stat-top"><span class="stat-caption">TAREFAS EM ATRASO</span></div><div class="stat-value">{{ dashboardTasks.filter((task) => task.deadline && task.deadline < today && task.status !== 'done').length }}</div><div class="stat-foot">Precisam da tua atenção</div></article>
-          </section>
-          <section class="tasks-section overview-tasks">
-            <div class="section-header"><div><span class="section-kicker">PRÓXIMOS PASSOS</span><h2>Tarefas próximas do prazo</h2></div><button class="text-button" @click="activeView = 'tasks'">Ver todas →</button></div>
-            <div v-if="dashboardTasks.filter((task) => task.status !== 'done').length" class="overview-task-list">
-              <button v-for="task in dashboardTasks.filter((item) => item.status !== 'done').slice(0, 6)" :key="task.id" class="overview-task" @click="openTask(task)">
-                <span class="project-dot" :style="{ background: projects.find((project) => project.id === task.project_id)?.color ?? '#7165e8' }"></span>
-                <span class="overview-task-copy"><strong>{{ task.title }}</strong><small>{{ projects.find((project) => project.id === task.project_id)?.name ?? 'Projeto' }} · {{ formatDate(task.deadline) }}</small></span>
-                <span class="priority-pill" :class="`priority-${task.priority}`"><i></i>{{ priorityLabel(task.priority) }}</span>
-              </button>
-            </div>
-            <div v-else class="empty-state"><span class="empty-icon">✳</span><h3>Está tudo em dia.</h3><p>Cria um projeto ou tarefa para começares.</p><button class="button button-primary" @click="openProjectForm()">＋ Novo projeto</button></div>
-          </section>
-          <section class="tasks-section">
-            <div class="section-header"><div><span class="section-kicker">VISÃO GERAL</span><h2>Os teus projetos</h2></div><button class="text-button" @click="activeView = 'projects'">Ver projetos →</button></div>
-            <div class="project-card-grid">
-              <button v-for="project in projects.slice(0, 3)" :key="project.id" class="project-card" @click="activeProjectId = project.id; activeView = 'project'">
-                <span class="project-card-icon" :style="{ color: project.color, background: `${project.color}18` }">▤</span><span class="project-card-state">Em curso</span>
-                <strong>{{ project.name }}</strong><small>{{ project.category }} · {{ project.task_count }} tarefas</small>
-                <span class="project-progress"><i :style="{ width: `${project.task_count ? Math.round(project.completed_count / project.task_count * 100) : 0}%`, background: project.color }"></i></span>
-                <span class="project-progress-label">{{ project.task_count ? Math.round(project.completed_count / project.task_count * 100) : 0 }}% concluído</span>
-              </button>
-            </div>
-          </section>
-        </template>
-
         <!-- Pesquisa e filtros afetam a coleção visível sem alterar os projetos originais. -->
-        <template v-else-if="activeView === 'projects'">
+        <template v-if="activeView === 'projects'">
           <section class="project-metrics" aria-label="Resumo dos projetos">
             <article class="project-metric metric-projects"><strong>{{ projectDashboardStats.active }}</strong><span>{{ showArchivedProjects ? 'Projetos arquivados' : 'Projetos ativos' }}</span></article>
             <article class="project-metric metric-progress"><strong>{{ projectDashboardStats.inProgress }}</strong><span>Tarefas em curso</span></article>
